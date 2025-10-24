@@ -1,0 +1,6 @@
+pandas
+geopandas
+pycausalimpact
+scikit-learn
+matplotlib
+notebook
