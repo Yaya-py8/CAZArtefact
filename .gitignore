@@ -1,0 +1,36 @@
+--- Virtual Environments ---
+
+This is the most important rule
+
+venv/
+.venv/
+env/
+*.env
+
+--- Python ---
+
+Compiled files and caches
+
+pycache/
+*.py[cod]
+*$py.class
+
+--- macOS ---
+
+System junk files
+
+.DS_Store
+.AppleDouble
+.LSOverride
+
+--- Notebooks ---
+
+Notebook checkpoints
+
+.ipynb_checkpoints
+
+--- IDE ---
+
+VSCode
+
+.vscode/
