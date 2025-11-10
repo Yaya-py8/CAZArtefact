@@ -4,3 +4,4 @@ pycausalimpact
 scikit-learn
 matplotlib
 notebook
+casualimpact
