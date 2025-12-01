@@ -8,7 +8,6 @@ library(zoo)
 library(dplyr) # For duplicate handling
 
 # --- 2. Load your master dataset ---
-# Make sure the file path is correct
 master_file <- "/Users/yahye/Desktop/Masters Project/CAZArtefact/master_combined.csv"
 print(paste("Loading master file:", master_file))
 data <- read.csv(master_file)
@@ -32,11 +31,9 @@ if (duplicate_count > 0) {
 print("Creating hourly zoo object...")
 data_zoo_hourly <- zoo(data[, -which(names(data) == "datetime")], order.by = data$datetime)
 
-# --- 5. !! NEW STEP: Aggregate to Daily Averages !! ---
-print("Aggregating data to daily averages...")
+# --- 5. Aggregate to Daily Averages and Interpolate ---
+print("Aggregating data to daily averages and interpolating...")
 
-# Define a "safe mean" function that returns NA if the whole day is missing
-# This prevents 'NaN' from mean(na.rm=TRUE) on an all-NA day
 safe_mean <- function(x) {
   if (all(is.na(x))) {
     return(NA_real_)
@@ -45,90 +42,98 @@ safe_mean <- function(x) {
   }
 }
 
-# Aggregate the hourly data to daily data using the safe_mean function
 data_daily <- aggregate(data_zoo_hourly, as.Date(index(data_zoo_hourly)), FUN = safe_mean)
-
-# --- 6. !! MODIFIED: Interpolate missing DAILY data !! ---
-print("Interpolating missing daily values...")
 data_interpolated <- na.approx(data_daily, na.rm = FALSE)
 data_interpolated <- na.locf(data_interpolated, na.rm = FALSE, fromLast = TRUE)
 data_interpolated <- na.locf(data_interpolated, na.rm = FALSE)
-
-print("Checking for remaining NAs...")
 print(paste("NAs remaining after interpolation:", sum(is.na(data_interpolated))))
 
-# --- 7. Prepare data for the model ---
-print("Preparing data for model...")
-
-# Create the 'treatment' variable (y) by averaging Bristol stations
+# --- 6. Prepare data for the model ---
 y_avg_values <- rowMeans(data_interpolated[, c("TW_NO2", "SP_NO2")], na.rm = TRUE)
-
-# Convert the result back into a zoo object with the correct index
 y_Bristol_CAZ_NO2 <- zoo(y_avg_values, order.by = index(data_interpolated))
 
-# Create the 'control' variables (X)
-control_vars <- c(
-    "Cardiff_NO2",
-    "TW_M_T",
-    "TW_M_SPED"# Wind Speed from Temple Way
-)
-X_controls <- data_interpolated[, control_vars]
-
-# Combine y and X into the final model data frame
-print("Combining treatment and control variables...")
-model_data <- cbind(y_Bristol_CAZ_NO2, X_controls)
-
-# --- 8. !! MODIFIED: Define Time Periods using Dates !! ---
-print("Defining pre/post periods using Dates...")
-
-# Get the start date from the data
-pre_period_start <- start(model_data)
-
-# Define the intervention date as a Date object
+# --- Define Time Periods ---
+pre_period_start <- start(data_interpolated)
 intervention_date <- as.Date("2022-11-28")
-
-# Define the end date as a Date object
-post_period_end <- min(as.Date("2025-10-24"), end(model_data))
-
-
-# Define pre-period from the start up to the day BEFORE intervention
-pre_period_end <- intervention_date - 1 # Subtracts 1 day
+post_period_end <- min(as.Date("2025-10-24"), end(data_interpolated))
+pre_period_end <- intervention_date - 1 
 pre_period <- c(pre_period_start, pre_period_end)
-
-# Define post-period from the intervention date to the end date
 post_period_start <- intervention_date
 post_period <- c(post_period_start, post_period_end)
 
-# --- Verification ---
-print("Final period vectors created:")
-print("Pre-period:")
-print(pre_period)
-print("Post-period:")
-print(post_period)
-if (anyNA(pre_period) || anyNA(post_period)) {
-   stop("ERROR: NA values detected in period definitions. Check dates.")
-}
-# --- End Verification ---
 
-# --- 9. !! MODIFIED: Run the model with Seasonality !! ---
-print("Running CausalImpact analysis...")
-# We add model.args to account for weekly seasonality (7 days)
-# This often significantly improves the model for daily data
-impact <- CausalImpact(model_data,
-                       pre.period = pre_period,
-                       post.period = post_period,
-                       model.args = list(nseasons = 7)) # nseasons = 7 for weekly pattern
+# ======================================================================
+# --- RUN 1: MAIN MODEL (Figure 4.2) ---
+# Full Controls: Cardiff, Liv, Leeds + Temp, Speed
+# ======================================================================
+control_vars_main <- c("Cardiff_NO2", "Liv_NO2", "Leeds_NO2", "TW_M_T", "TW_M_SPED")
+X_controls_main <- data_interpolated[, control_vars_main]
+model_data_main <- cbind(y_Bristol_CAZ_NO2, X_controls_main)
 
-# --- 10. Print summary and save plot ---
-print("--- CausalImpact Summary ---")
-summary(impact)        # Prints the statistical table to the console
-summary(impact, "report") # Prints the longer explanation to the console
+print("Running Main Model (Fig. 4.2)...")
+impact_main <- CausalImpact(model_data_main, pre.period = pre_period, post.period = post_period, model.args = list(nseasons = 7))
 
-print("Saving plot...")
-# Save the plot as a PNG file in your current folder
+# --- SAVE PLOT FOR FIGURE 4.2 (Main Result) ---
+png("causal_impact_results_DAILY_R.png", width=800, height=600)
+# Use par and mtext to reliably add the title to the plot margin
+par(oma = c(0, 0, 2, 0)) 
+plot(impact_main)
+mtext("Figure 4.2: Causal Impact Model - Refined Daily Analysis", outer = TRUE, cex = 1.2, line = 0.5) 
+dev.off() 
+
+
+# ======================================================================
+# --- RUN 2: SENSITIVITY TEST 1 (Figure 4.3) ---
+# No Meteorology
+# ======================================================================
+control_vars_test1 <- c("Cardiff_NO2", "Liv_NO2", "Leeds_NO2")
+X_controls_test1 <- data_interpolated[, control_vars_test1]
+model_data_test1 <- cbind(y_Bristol_CAZ_NO2, X_controls_test1)
+
+print("Running Sensitivity Test 1 (Fig. 4.3 - No Meteorology)...")
+impact_test1 <- CausalImpact(model_data_test1, pre.period = pre_period, post.period = post.period, model.args = list(nseasons = 7))
+
+# --- SAVE PLOT FOR FIGURE 4.3 ---
+png("causal_impact_results_Test2_R.png", width=800, height=600)
+par(oma = c(0, 0, 2, 0)) 
+plot(impact_test1)
+mtext("Figure 4.3: Sensitivity Analysis - Excluding Meteorological Controls", outer = TRUE, cex = 1.2, line = 0.5)
+dev.off()
+
+
+# ======================================================================
+# --- RUN 3: SENSITIVITY TEST 2 (Figure 4.4) ---
+# Cardiff Only
+# ======================================================================
+control_vars_test2 <- c("Cardiff_NO2", "TW_M_T", "TW_M_SPED")
+X_controls_test2 <- data_interpolated[, control_vars_test2]
+model_data_test2 <- cbind(y_Bristol_CAZ_NO2, X_controls_test2)
+
+print("Running Sensitivity Test 2 (Fig. 4.4 - Cardiff Only)...")
+impact_test2 <- CausalImpact(model_data_test2, pre.period = pre.period, post.period = post.period, model.args = list(nseasons = 7))
+
+# --- SAVE PLOT FOR FIGURE 4.4 ---
 png("causal_impact_results_Test3_R.png", width=800, height=600)
-plot(impact)
-dev.off() # Closes the PNG device
+par(oma = c(0, 0, 2, 0)) 
+plot(impact_test2)
+mtext("Figure 4.4: Sensitivity Analysis - Cardiff Only Predictor", outer = TRUE, cex = 1.2, line = 0.5)
+dev.off()
 
-print("Success! Results plot saved as 'causal_impact_results_Test3_R.png'")
 
+# ======================================================================
+# --- FINAL SUMMARY OUTPUT ---
+# Print the reports for the final chapter write-up.
+# ======================================================================
+print("--- FINAL STATISTICAL SUMMARIES FOR CHAPTER 4 ---")
+# Get the R-squared for the main model (needed for Chapter 4.4.1)
+print("Main Model R-Squared:")
+summary(impact_main$model$bsts.model)
+
+print("--- Main Model (Fig 4.2) Full Report ---")
+summary(impact_main, "report")
+print("--- Test 1 (No Met) Full Report ---")
+summary(impact_test1, "report")
+print("--- Test 2 (Cardiff Only) Full Report ---")
+summary(impact_test2, "report")
+
+print("Success! All CausalImpact models have run, and all three plots (Fig 4.2, 4.3, 4.4) are saved.")
