@@ -110,7 +110,7 @@ if 'lat' in df.columns and 'lon' in df.columns and 'Percentage Change (%)' in df
 
     # --- PART 2: The Styled Data Table ---
     st.subheader("2. Explore the Underlying Data")
-    st.markdown("Full dataset with colour-coded pollution changes.")
+    st.markdown("Full dataset with colougit pull origin main --no-rebaser-coded pollution changes.")
 
     # Select columns to display
     display_cols = ['Diffusion Tube ID', 'Location', 'NO2_Before', 'NO2_After', 'Percentage Change (%)']
