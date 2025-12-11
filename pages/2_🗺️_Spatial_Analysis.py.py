@@ -49,6 +49,23 @@ if 'lat' in df.columns and 'lon' in df.columns and 'Percentage Change (%)' in df
     # 1. Create Base Map centered on Bristol (Zoomed in for detail)
     m = folium.Map(location=[51.4545, -2.5879], zoom_start=13, tiles="CartoDB positron")
 
+    # --- NEW: Add CAZ Boundary Layer ---
+    try:
+        # Load the GeoJSON file
+        # style_function makes it transparent (no fill) with a black outline
+        boundary_style = lambda x: {'fillColor': '#00000000', 'color': 'black', 'weight': 3}
+        
+        folium.GeoJson(
+            "bristol_caz_boundary.geojson",
+            name="CAZ Boundary",
+            style_function=boundary_style,
+            tooltip="Clean Air Zone Boundary"
+        ).add_to(m)
+        
+    except Exception as e:
+        # Don't crash if file is missing, just warn the user
+        st.warning(f"Could not load CAZ Boundary file: {e}")
+
     # 2. Add Precision Markers
     for index, row in df.iterrows():
         # Determine color: Red for Increase (Bad), Blue for Decrease (Good)
@@ -93,7 +110,7 @@ if 'lat' in df.columns and 'lon' in df.columns and 'Percentage Change (%)' in df
 
     # --- PART 2: The Styled Data Table ---
     st.subheader("2. Explore the Underlying Data")
-    st.markdown("Full dataset with color-coded pollution changes.")
+    st.markdown("Full dataset with colour-coded pollution changes.")
 
     # Select columns to display
     display_cols = ['Diffusion Tube ID', 'Location', 'NO2_Before', 'NO2_After', 'Percentage Change (%)']
