@@ -1,6 +1,6 @@
 import pandas as pd
 
-# 1. Define the exact headers in order
+# 1. Defines the column headers in order
 col_names = [
     'Diffusion Tube ID', 
     'X OS Grid Ref (Easting)', 
@@ -15,14 +15,14 @@ col_names = [
     '2024'
 ]
 
-# The file you just saved that has NO headers
+# The input file has no headers whilst the output file has headers
 input_file = '/Users/yahye/Downloads/tabula-Bristol City Council_ASR_2025.csv'
 output_file = 'bristol_diffusion_tubes_WITH_HEADERS.csv'
 
-# 2. Read the CSV, telling pandas it has no header and to use your names
+# 2. Read the CSV, telling pandas it has no header and to use the column names
 df = pd.read_csv(input_file, header=None, names=col_names)
 
-# 3. Save the file. This new file will have the headers.
+# 3. Outputs file with column headers.
 df.to_csv(output_file, index=False)
 
 print(f"Success! New file saved as: {output_file}")
