@@ -1,5 +1,4 @@
 # --- 1. Install and load necessary libraries ---
-# (You only need to run install.packages once)
 # install.packages("CausalImpact")
 # install.packages("zoo")
 # install.packages("dplyr")
